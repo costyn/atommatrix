@@ -22,33 +22,34 @@ void setup(void)
     pinMode(BPM_BUTTON, INPUT_PULLUP);
 }
 
-static void setled(int x, int y, CRGB c)
+static void setled(int x, int y, int hue)
 {
-    leds[y * 5 + x] = c;
+    leds[y * 5 + x] = CHSV(hue, 255, 255);
 }
+
 
 static void drawHeart()
 {
     memset(leds, 0, sizeof(leds));
-    CRGB c = CRGB::Red;
+    int c = beat8(12);
 
     setled(1,0,c);
     setled(3,0,c);
 
     setled(0,1,c);
-    setled(1,1,c);
+    setled(1,1,c+180);
     setled(2,1,c);
-    setled(3,1,c);
+    setled(3,1,c+180);
     setled(4,1,c);
 
     setled(0,2,c);
-    setled(1,2,c);
-    setled(2,2,c);
-    setled(3,2,c);
+    setled(1,2,c+180);
+    setled(2,2,c+180);
+    setled(3,2,c+180);
     setled(4,2,c);
 
     setled(1,3,c);
-    setled(2,3,c);
+    setled(2,3,c+180);
     setled(3,3,c);
 
     setled(2,4,c);
