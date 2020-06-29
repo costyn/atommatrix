@@ -7,17 +7,17 @@ MPU6886::MPU6886(){
 }
 
 void MPU6886::I2C_Read_NBytes(uint8_t driver_Addr, uint8_t start_Addr, uint8_t number_Bytes, uint8_t *read_Buffer){
-    
+
   Wire1.beginTransmission(driver_Addr);
-  Wire1.write(start_Addr);  
+  Wire1.write(start_Addr);
   Wire1.endTransmission(false);
   uint8_t i = 0;
   Wire1.requestFrom(driver_Addr,number_Bytes);
-  
+
   //! Put read results in the Rx buffer
   while (Wire1.available()) {
     read_Buffer[i++] = Wire1.read();
-  }        
+  }
 }
 
 void MPU6886::I2C_Write_NBytes(uint8_t driver_Addr, uint8_t start_Addr, uint8_t number_Bytes, uint8_t *write_Buffer){
@@ -31,15 +31,15 @@ void MPU6886::I2C_Write_NBytes(uint8_t driver_Addr, uint8_t start_Addr, uint8_t 
 int MPU6886::Init(void){
   unsigned char tempdata[1];
   unsigned char regdata;
-  
-  Wire1.begin(25,21);
-  
+
+  Wire1.begin(25,21,100000);
+
   I2C_Read_NBytes(MPU6886_ADDRESS, MPU6886_WHOAMI, 1, tempdata);
   Serial.printf("%02X\r\n",tempdata[0]);
   if(tempdata[0] != 0x19)
     return -1;
   delay(1);
-  
+
   regdata = 0x00;
   I2C_Write_NBytes(MPU6886_ADDRESS, MPU6886_PWR_MGMT_1, 1, &regdata);
   delay(10);
@@ -99,9 +99,9 @@ int MPU6886::Init(void){
 
 void MPU6886::getAccelAdc(int16_t* ax, int16_t* ay, int16_t* az){
 
-   uint8_t buf[6];  
+   uint8_t buf[6];
    I2C_Read_NBytes(MPU6886_ADDRESS,MPU6886_ACCEL_XOUT_H,6,buf);
-   
+
    *ax=((int16_t)buf[0]<<8)|buf[1];
    *ay=((int16_t)buf[2]<<8)|buf[3];
    *az=((int16_t)buf[4]<<8)|buf[5];
@@ -111,19 +111,19 @@ void MPU6886::getGyroAdc(int16_t* gx, int16_t* gy, int16_t* gz){
 
   uint8_t buf[6];
   I2C_Read_NBytes(MPU6886_ADDRESS,MPU6886_GYRO_XOUT_H,6,buf);
-  
-  *gx=((uint16_t)buf[0]<<8)|buf[1];  
-  *gy=((uint16_t)buf[2]<<8)|buf[3];  
+
+  *gx=((uint16_t)buf[0]<<8)|buf[1];
+  *gy=((uint16_t)buf[2]<<8)|buf[3];
   *gz=((uint16_t)buf[4]<<8)|buf[5];
-  
+
 }
 
 void MPU6886::getTempAdc(int16_t *t){
-  
-  uint8_t buf[2];  
+
+  uint8_t buf[2];
   I2C_Read_NBytes(MPU6886_ADDRESS,MPU6886_TEMP_OUT_H,2,buf);
-  
-  *t=((uint16_t)buf[0]<<8)|buf[1];  
+
+  *t=((uint16_t)buf[0]<<8)|buf[1];
 }
 
 
@@ -131,7 +131,7 @@ void MPU6886::getTempAdc(int16_t *t){
 //!俯仰，航向，横滚：pitch，yaw，roll，指三维空间中飞行器的旋转状态。
 void MPU6886::getAhrsData(float *pitch,float *roll,float *yaw){
 
-  float accX = 0; 
+  float accX = 0;
   float accY = 0;
   float accZ = 0;
 
@@ -142,6 +142,35 @@ void MPU6886::getAhrsData(float *pitch,float *roll,float *yaw){
 
   getGyroData(&gyroX,&gyroY,&gyroZ);
   getAccelData(&accX,&accY,&accZ);
+
+  MahonyAHRSupdateIMU(gyroX * DEG_TO_RAD, gyroY * DEG_TO_RAD, gyroZ * DEG_TO_RAD, accX, accY, accZ,pitch,roll,yaw);
+
+}
+
+void MPU6886::getAttitude(double *pitch, double *roll)
+{
+    float accX = 0;
+    float accY = 0;
+    float accZ = 0;
+
+    float gyroX = 0;
+    float gyroY = 0;
+    float gyroZ = 0;
+
+    getGyroData(&gyroX, &gyroY, &gyroZ);
+    getAccelData(&accX, &accY, &accZ);
+
+    if ((accX < 1) && (accX > -1))
+    {
+        *pitch = asin(-accX) * 57.295;
+    }
+    if (accZ != 0)
+    {
+        *roll = atan(accY / accZ) * 57.295;
+    }
+
+    ( *pitch ) = _alpha * ( *pitch ) + (1 - _alpha) * _last_theta;
+    ( *roll ) = _alpha * ( *roll ) + (1 - _alpha) * _last_phi;
 }
 
 void MPU6886::getGres(){
@@ -170,7 +199,7 @@ void MPU6886::getAres(){
    switch (Acscale)
    {
    // Possible accelerometer scales (and their register bit settings) are:
-   // 2 Gs (00), 4 Gs (01), 8 Gs (10), and 16 Gs  (11). 
+   // 2 Gs (00), 4 Gs (01), 8 Gs (10), and 16 Gs  (11).
    // Here's a bit of an algorith to calculate DPS/(ADC tick) based on that 2-bit value:
     case AFS_2G:
           aRes = 2.0/32768.0;
@@ -187,11 +216,11 @@ void MPU6886::getAres(){
   }
 
 }
- 
+
 void MPU6886::SetGyroFsr(Gscale scale)
 {
     //return IIC_Write_Byte(MPU_GYRO_CFG_REG,scale<<3);//设置陀螺仪满量程范围
-    unsigned char regdata;	
+    unsigned char regdata;
     regdata = (scale<<3);
     I2C_Write_NBytes(MPU6886_ADDRESS, MPU6886_GYRO_CONFIG, 1, &regdata);
     delay(10);
@@ -202,7 +231,7 @@ void MPU6886::SetGyroFsr(Gscale scale)
 
 void MPU6886::SetAccelFsr(Ascale scale)
 {
-    unsigned char regdata;	
+    unsigned char regdata;
     regdata = (scale<<3);
     I2C_Write_NBytes(MPU6886_ADDRESS, MPU6886_ACCEL_CONFIG, 1, &regdata);
     delay(10);
@@ -211,6 +240,40 @@ void MPU6886::SetAccelFsr(Ascale scale)
     getAres();
 }
 
+// pitch: -0.053944	 roll -179.007584	 yaw 87.748726
+
+void MPU6886::CalibrateGyro(int seconds)
+{
+  int startTime = millis();
+  int sampleCount = 0;
+
+  //We use 100hz for calibration
+
+  //Clear previous calibration data;
+  _cx = 0;
+  _cy = 0;
+  _cz = 0;
+
+  float gyx = 0,gyy = 0,gyz = 0;
+  //Collect Data
+  while (millis() < startTime + (1000 * seconds)){
+      float gx,gy,gz;
+      getGyroData(&gx,&gy,&gz);
+      gyx += gx;
+      gyy += gy;
+      gyz += gz;
+      sampleCount++;
+      // Serial.printf("%.2f,%.2f,%.2f o/s \r\n", gx, gy, gz);
+      delay(10);
+  }
+  Serial.print(sampleCount);
+  Serial.println(" Samples Taken");
+  Serial.printf("%.2f,%.2f,%.2f o/s \r\n", gyx, gyy, gyz);
+  _cx = gyx / sampleCount;
+  _cy = gyy / sampleCount;
+  _cz = gyz / sampleCount;
+  Serial.printf("%.2f,%.2f,%.2f o/s \r\n", _cx, _cy, _cz);
+}
 
 
 
@@ -228,22 +291,30 @@ void MPU6886::getAccelData(float* ax, float* ay, float* az){
   *az = (float)accZ * aRes;
 
 }
-      
+
 void MPU6886::getGyroData(float* gx, float* gy, float* gz){
   int16_t gyroX = 0;
   int16_t gyroY = 0;
   int16_t gyroZ = 0;
   getGyroAdc(&gyroX,&gyroY,&gyroZ);
 
-  *gx = (float)gyroX * gRes;
-  *gy = (float)gyroY * gRes;
-  *gz = (float)gyroZ * gRes;
+  *gx = ((float)gyroX * gRes) - _cx;
+  *gy = ((float)gyroY * gRes) - _cy;
+  *gz = ((float)gyroZ * gRes) - _cz;
 }
 
+void MPU6886::getCalibData(float* cx, float* cy, float* cz){
+
+  *cx = _cx;
+  *cy = _cy;
+  *cz = _cz;
+}
+
+
 void MPU6886::getTempData(float *t){
-  
+
   int16_t temp = 0;
   getTempAdc(&temp);
-  
+
   *t = (float)temp / 326.8 + 25.0;
 }

@@ -10,8 +10,9 @@
 
 #include <Wire.h>
 #include <Arduino.h>
+#include "MahonyAHRS.h"
 
-#define MPU6886_ADDRESS           0x68 
+#define MPU6886_ADDRESS           0x68
 #define MPU6886_WHOAMI            0x75
 #define MPU6886_ACCEL_INTEL_CTRL  0x69
 #define MPU6886_SMPLRT_DIV        0x19
@@ -45,7 +46,7 @@
 
 //#define G (9.8)
 #define RtA     57.324841
-#define AtR    	0.0174533	
+#define AtR    	0.0174533
 #define Gyro_Gr	0.0010653
 
 class MPU6886 {
@@ -76,17 +77,22 @@ class MPU6886 {
       void getAccelData(float* ax, float* ay, float* az);
       void getGyroData(float* gx, float* gy, float* gz);
       void getTempData(float *t);
+      void getCalibData(float* cx, float* cy, float* cz);
 
       void SetGyroFsr(Gscale scale);
       void SetAccelFsr(Ascale scale);
+      void CalibrateGyro(int seconds);
 
       void getAhrsData(float *pitch,float *roll,float *yaw);
-
+      void getAttitude(double *pitch, double *roll);
     public:
       float aRes, gRes;
 
     private:
-
+        float _last_theta = 0;
+        float _last_phi = 0;
+        float _alpha = 0.5;
+        float _cx = 0, _cy = 0, _cz = 0;
     private:
       void I2C_Read_NBytes(uint8_t driver_Addr, uint8_t start_Addr, uint8_t number_Bytes, uint8_t *read_Buffer);
       void I2C_Write_NBytes(uint8_t driver_Addr, uint8_t start_Addr, uint8_t number_Bytes, uint8_t *write_Buffer);
